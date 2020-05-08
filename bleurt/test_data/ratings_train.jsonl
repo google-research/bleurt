@@ -1,0 +1,4 @@
+{"candidate":"Bud Powell was a legendary pianist.","reference":"Bud Powell was a legendary pianist.","score":1.5}
+{"candidate":"Bud Powell was a historical piano player.", "reference":"Bud Powell was a legendary pianist.", "score":0.75}
+{"candidate":"Bud Powell was a new yorker.","reference":"Bud Powell was a legendary pianist.","score":-0.75}
+{"candidate":"Bud a day keeps the doctor away.","reference":"Bud Powell was a legendary pianist.","score":-1.5}

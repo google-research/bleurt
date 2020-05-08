@@ -1,0 +1,1 @@
+{"name": "bert_custom", "vocab_file": "vocab.txt", "bert_config_file": "bert_config.json", "do_lower_case": true, "max_seq_length": 128}
