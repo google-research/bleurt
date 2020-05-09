@@ -15,9 +15,19 @@ You may install it as follows:
 
 ```
 pip install --upgrade pip  # ensures that pip is current
-pip install git+https://github.com/google-research/tf-slim.git  # necessary because tf-slim 1.1 is not on pip yet.
+git clone https://github.com/google-research/bleurt.git
+cd bleurt
 pip install .
 ```
+
+You may check your install with unit tests:
+
+```
+python -m unittest bleurt.score_test
+python -m unittest bleurt.score_not_eager_test
+python -m unittest bleurt.finetune_test
+```
+
 
 ## Using BLEURT
 
@@ -46,7 +56,7 @@ You may also specify the flag `bleurt_batch_size` which determines the number of
 The following command lists all the other command-line options:
 
 ```
-python bleurt.score.py -helpshort
+python -m bleurt.score -helpshort
 ```
 
 
@@ -115,11 +125,21 @@ Name                            | Max #tokens  | Size (#layers, # hidden units) 
 [BLEURT-Large](https://storage.googleapis.com/bleurt-oss/bleurt-large-128.zip)                | 128 | 24-1024 |
 [BLEURT-Large](https://storage.googleapis.com/bleurt-oss/bleurt-large-512.zip)                | 512 | 24-1024 |
 
+For instance, you may use BLEURT-tiny-512 as follows:
+
+```
+wget https://storage.googleapis.com/bleurt-oss/bleurt-tiny-512.zip .
+unzip bleurt-tiny-512.zip
+python -m bleurt.score \
+  -candidate_file=bleurt/test_data/candidates \
+  -reference_file=bleurt/test_data/references \
+  -bleurt_checkpoint=bleurt-tiny-512
+```
 
 
 The column `max #tokens` specifies the size of BLEURT's input. Internally, the model tokenizes candidate and the reference, concatenates them, then adds 3 special tokens. The field indicates the maximum total number of [WordPiece tokens](https://github.com/google/sentencepiece). If the threshold is exceeded, BLEURT truncates the input. A higher number of tokens leads to a larger memory footprint.
 
-In generaly, the larger the checkpoints the more accurate the ratings. The following table compares BLEURT's performance to that of the best approaches available at the time of writing on the [WMT Metrics shared task 2019](http://www.statmt.org/wmt19/). We report the Kendall Tau between the metrics and human ratings, higher is better.
+In generally, the larger the checkpoints the more accurate the ratings. The following table compares BLEURT's performance to that of the best approaches available at the time of writing on the [WMT Metrics shared task 2019](http://www.statmt.org/wmt19/). We report the Kendall Tau between the metrics and human ratings, higher is better.
 
 
 Model                  | Max #tokens| de-en| fi-en| gu-en|kk-en | lt-en|ru-en | zh-en| **Average** |
@@ -127,12 +147,12 @@ Model                  | Max #tokens| de-en| fi-en| gu-en|kk-en | lt-en|ru-en | 
 YiSi-SRL               |            | 26.3 | 27.8 | 26.6 | 36.9 | 30.9 | 25.3 | 38.9 | **30.4** |
 BERTscore (BERT-large) |            | 26.2 | 27.6 | 25.8 | 36.9 | 30.8 | 25.2 | 37.5 | **30.0** |
 BLEU                   |            | 19.4 | 20.6 | 17.3 | 30.0 | 23.8 | 19.4 | 28.7 | **22.7** |
-BERT-tiny              |   128      | 25.4 | 25.7 | 23.7 | 36.3 | 29.0 | 23.3 | 35.0 | **28.3** |
-BERT-tiny              |   512      | 26.1 | 26.0 | 24.5 | 36.7 | 29.4 | 23.7 | 36.1 | **28.9** |
-BERT-base              |   128      | 31.3 | 31.4 | 28.1 | 39.6 | 35.4 | 28.4 | 41.7 | **33.7** |
-BERT-base              |   512      | 31.0 | 31.2 | 28.3 | 39.1 | 35.2 | 28.0 | 41.7 | **33.5** |
-BERT-large             |   128      | 31.4 | 31.9 | 28.1 | 39.8 | 35.4 | 28.4 | 42.4 | **33.9** |
-BERT-large             |   512      | 31.3 | 31.8 | 27.7 | 39.2 | 34.8 | 28.7 | 43.4 | **33.9** |
+BLEURT-tiny              |   128      | 25.4 | 25.7 | 23.7 | 36.3 | 29.0 | 23.3 | 35.0 | **28.3** |
+BLEURT-tiny              |   512      | 26.1 | 26.0 | 24.5 | 36.7 | 29.4 | 23.7 | 36.1 | **28.9** |
+BLEURT-base              |   128      | 31.3 | 31.4 | 28.1 | 39.6 | 35.4 | 28.4 | 41.7 | **33.7** |
+BLEURT-base              |   512      | 31.0 | 31.2 | 28.3 | 39.1 | 35.2 | 28.0 | 41.7 | **33.5** |
+BLEURT-large             |   128      | 31.4 | 31.9 | 28.1 | 39.8 | 35.4 | 28.4 | 42.4 | **33.9** |
+BLEURT-large             |   512      | 31.3 | 31.8 | 27.7 | 39.2 | 34.8 | 28.7 | 43.4 | **33.9** |
 
 
 Those checkpoints were trained in three steps: normal BERT pre-training (see [Devlin et al.](https://arxiv.org/abs/1810.04805) and [Turc et al.](https://arxiv.org/abs/1908.08962)), pre-training on synthetic ratings, then fine-tuning on the [WMT Metrics](http://www.statmt.org/wmt19/metrics-task.html) database of human ratings, years 2015 to 2018. The general approach is presented in our [paper](https://arxiv.org/abs/2004.04696). Compared to the published results, we used 20k training steps, a batch size of 16, and export every 250 steps.
@@ -251,10 +271,12 @@ python -m bleurt.wmt.benchmark \
  -vocab_file=${BERT_DIR}/vocab.txt \
  -num_train_steps=20000
 ```
-The exact correlations will probably be different from those compared the results
-reported in the paper because of small differences in setup and initialization.
-
-For years 2018 and 2019, we recommend setting the flag `average_duplicates_on_test`
+For years 2018 and 2019, the flag `average_duplicates_on_test` must be set
 to `False` for a direct comparison with results from the paper. This flag
 enables averaging different ratings for each distinct reference-candidate pair,
 which the organizers of the WMT shared task started doing in 2018.
+
+The exact correlations will probably be different from those
+reported in the paper because of differences in setup and initialization
+(expect differences between 0.001 and 0.1).
+
