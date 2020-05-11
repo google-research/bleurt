@@ -1,8 +1,8 @@
-# BLEURT: a BERT-Based Metric for Natural Language Generation
+# BLEURT: a Transfer Learning-Based Metric for Natural Language Generation
 
 BLEURT is an evaluation metric for Natural Language Generation. It takes a pair of sentences as input, a *reference* and a *candidate*, and it returns a score that indicates to what extent the candidate is grammatical and conveys the mearning of the reference. It is comparable to [`sentence-BLEU`](https://en.wikipedia.org/wiki/BLEU) and [`BERTscore`](https://arxiv.org/abs/1904.09675).
 
-BLEURT is a *trained metric*, that is, it is a regression model trained on ratings data. The model is based on [`BERT`](https://arxiv.org/abs/1810.04805). This repository contains all the code necessary to use or customize a pre-trained version of the metric. BLEURT uses Tensorflow, and it  benefits greatly from modern GPUs.
+BLEURT is a *trained metric*, that is, it is a regression model trained on ratings data. The model is based on [`BERT`](https://arxiv.org/abs/1810.04805). This repository contains all the code necessary to use it and/or fine-tune it for your own applications. BLEURT uses Tensorflow, and it benefits greatly from modern GPUs.
 
 A comprehensive overview of BLEURT can be found in our ACL paper [BLEURT: Learning Robust Metrics for Text Generation](https://arxiv.org/abs/2004.04696).
 
@@ -279,4 +279,3 @@ which the organizers of the WMT shared task started doing in 2018.
 The exact correlations will probably be different from those
 reported in the paper because of differences in setup and initialization
 (expect differences between 0.001 and 0.1).
-
