@@ -113,8 +113,8 @@ The crucial part is the call to `score.create_bleurt_ops`, which creates the TF 
 
 A *BLEURT checkpoint* is a self-contained folder that contains a regression model and some information that BLEURT needs to run. BLEURT checkpoints can be downloaded, copy-pasted, and stored anywhere. Furthermore, checkpoints are tunable, which means that they can be fine-tuned on custom ratings data.
 
-
-Currently, the following six BLEURT checkpoints are available. If you don't know where to start, we recommend using BLEURT-base with 128 tokens.
+Currently, the following six BLEURT checkpoints are available, fine-tuned on [WMT Metrics ratings data from 2015 to 2018](http://www.statmt.org/wmt19/metrics-task.html).
+If you don't know where to start, we recommend using BLEURT-base with 128 tokens.
 
 Name                            | Max #tokens  | Size (#layers, # hidden units)  |
 :------------------------------ |:---:| :----:|
@@ -136,6 +136,10 @@ python -m bleurt.score \
   -bleurt_checkpoint=bleurt-tiny-512
 ```
 
+
+Note: the checkpoints are not calibrated like BLEU; the results are not in the range [0,1].
+Instead, they simulate the human ratings of the [WMT Metrics Shared Task](http://www.statmt.org/wmt19/metrics-task.html), which are standardized per annotator.
+We advise to use the metrics for comparison, and recommend against interpreting the absolute values.
 
 The column `max #tokens` specifies the size of BLEURT's input. Internally, the model tokenizes candidate and the reference, concatenates them, then adds 3 special tokens. The field indicates the maximum total number of [WordPiece tokens](https://github.com/google/sentencepiece). If the threshold is exceeded, BLEURT truncates the input. A higher number of tokens leads to a larger memory footprint.
 
