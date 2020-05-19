@@ -2,7 +2,7 @@
 
 BLEURT is an evaluation metric for Natural Language Generation. It takes a pair of sentences as input, a *reference* and a *candidate*, and it returns a score that indicates to what extent the candidate is grammatical and conveys the mearning of the reference. It is comparable to [`sentence-BLEU`](https://en.wikipedia.org/wiki/BLEU) and [`BERTscore`](https://arxiv.org/abs/1904.09675).
 
-BLEURT is a *trained metric*, that is, it is a regression model trained on ratings data. The model is based on [`BERT`](https://arxiv.org/abs/1810.04805). This repository contains all the code necessary to use it and/or fine-tune it for your own applications. BLEURT uses Tensorflow, and it benefits greatly from modern GPUs.
+BLEURT is a *trained metric*, that is, it is a regression model trained on ratings data. The model is based on [`BERT`](https://arxiv.org/abs/1810.04805). This repository contains all the code necessary to use it and/or fine-tune it for your own applications. BLEURT uses Tensorflow, and it benefits greatly from modern GPUs (it runs on CPU too).
 
 A comprehensive overview of BLEURT can be found in our ACL paper [BLEURT: Learning Robust Metrics for Text Generation](https://arxiv.org/abs/2004.04696).
 
@@ -51,7 +51,7 @@ The files `candidates` and `references` contain one sentence per line (see the f
 
 The flags `bleurt_checkpoint` and `scores_file` are optional. If `bleurt_checkpoint` is not specified, BLEURT will default to the test checkpoint, based on [BERT-Tiny](https://github.com/google-research/bert). Given the modest performance of the model, this is not recommended. If `scores_files` is not specified, BLEURT will use the standard output.
 
-You may also specify the flag `bleurt_batch_size` which determines the number of sentence pairs processed at once by BLEURT. The default value is 100, you may want to increase or decrease it based on the memory available on your GPU. An alternative way to save memory is to use a smaller BERT version, as explained further.
+You may also specify the flag `bleurt_batch_size` which determines the number of sentence pairs processed at once by BLEURT. The default value is 100, you may want to increase or decrease it based on the memory available. More information on the topic [further down](#checkpoints).
 
 The following command lists all the other command-line options:
 
@@ -113,8 +113,7 @@ The crucial part is the call to `score.create_bleurt_ops`, which creates the TF 
 
 A *BLEURT checkpoint* is a self-contained folder that contains a regression model and some information that BLEURT needs to run. BLEURT checkpoints can be downloaded, copy-pasted, and stored anywhere. Furthermore, checkpoints are tunable, which means that they can be fine-tuned on custom ratings data.
 
-Currently, the following six BLEURT checkpoints are available, fine-tuned on [WMT Metrics ratings data from 2015 to 2018](http://www.statmt.org/wmt19/metrics-task.html).
-If you don't know where to start, we recommend using BLEURT-base with 128 tokens.
+Currently, the following six BLEURT checkpoints are available, fine-tuned on [WMT Metrics ratings data from 2015 to 2018](http://www.statmt.org/wmt19/metrics-task.html). They vary on two aspects: the size of the model, and the size of the input. The bigger the model, the more accurately it models human ratings, but the more resources it needs. If you don't know where to start, we recommend using BLEURT-base with 128 tokens.
 
 Name                            | Max #tokens  | Size (#layers, # hidden units)  |
 :------------------------------ |:---:| :----:|
@@ -136,14 +135,16 @@ python -m bleurt.score \
   -bleurt_checkpoint=bleurt-tiny-512
 ```
 
+The column `max #tokens` specifies the size of BLEURT's input. Internally, the model tokenizes candidate and the reference, concatenates them, then adds 3 special tokens. The field indicates the maximum total number of [WordPiece tokens](https://github.com/google/sentencepiece). If the threshold is exceeded, BLEURT truncates the input.
 
-Note: the checkpoints are not calibrated like BLEU; the results are not in the range [0,1].
+**Note 1:** The checkpoints are not calibrated like BLEU; the results are not in the range [0,1].
 Instead, they simulate the human ratings of the [WMT Metrics Shared Task](http://www.statmt.org/wmt19/metrics-task.html), which are standardized per annotator.
-We advise to use the metrics for comparison, and recommend against interpreting the absolute values.
+We advise to use the metrics for comparison, and recommend against interpreting the absolute values. See [here](https://github.com/google-research/bleurt/issues/1) for more information about BLEURT's calibration.
 
-The column `max #tokens` specifies the size of BLEURT's input. Internally, the model tokenizes candidate and the reference, concatenates them, then adds 3 special tokens. The field indicates the maximum total number of [WordPiece tokens](https://github.com/google/sentencepiece). If the threshold is exceeded, BLEURT truncates the input. A higher number of tokens leads to a larger memory footprint.
+**Note 2:** Each checkpoint is a different model. Thus the results produced by different checkpoints are not directly comparable with each other.
 
 In generally, the larger the checkpoints the more accurate the ratings. The following table compares BLEURT's performance to that of the best approaches available at the time of writing on the [WMT Metrics shared task 2019](http://www.statmt.org/wmt19/). We report the Kendall Tau between the metrics and human ratings, higher is better.
+
 
 
 Model                  | Max #tokens| de-en| fi-en| gu-en|kk-en | lt-en|ru-en | zh-en| **Average** |
@@ -160,6 +161,28 @@ BLEURT-large             |   512      | 31.3 | 31.8 | 27.7 | 39.2 | 34.8 | 28.7 
 
 
 Those checkpoints were trained in three steps: normal BERT pre-training (see [Devlin et al.](https://arxiv.org/abs/1810.04805) and [Turc et al.](https://arxiv.org/abs/1908.08962)), pre-training on synthetic ratings, then fine-tuning on the [WMT Metrics](http://www.statmt.org/wmt19/metrics-task.html) database of human ratings, years 2015 to 2018. The general approach is presented in our [paper](https://arxiv.org/abs/2004.04696). Compared to the published results, we used 20k training steps, a batch size of 16, and export every 250 steps.
+
+
+### More about runtime and memory
+Three parameters control BLEURT's runtime and memory footprint: the size of the
+model, the size of the input, and the batch size. The larger the model, the more resources
+it needs. The batch size controls the trade-off between memory and runtime.
+In general, the model benefits greatly from GPUs, but it can also run on a CPU.
+
+If you do not have access to a GPU or the memory on your GPU is small,
+we recommend using the smaller models and lowering the batch size, at least for development.
+Batch size 16 is a good place to start.
+
+For reference, the table below presents BLEURT's runtime on a laptop with no GPU, using batch size 16.
+
+Model                    | Max #tokens| 1k examples (mins) | 2k examples (mins) | 5k examples (mins) |
+:---------------------   |:----------:|:----:|:----:|:----:|
+BLEURT-tiny              |   128      |  0.1 | 0.1 | 0.3   |
+BLEURT-tiny              |   512      |  0.2 | 0.4 | 1.1   |
+BLEURT-base              |   128      | 2.0  | 4.1 | 10.1  |
+BLEURT-base              |   512      | 12.1 | 23.6 | 57.8 |
+
+We used a MacBook Pro with a 2.2 GHz 6-core Intel Core i7 and 32GB main memory.
 
 
 ### Fine-tuning BLEURT checkpoints
