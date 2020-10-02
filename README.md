@@ -14,10 +14,12 @@ library `tf-slim` (>=1.1, currently only available on GitHub).
 You may install it as follows:
 
 ```
-pip install --upgrade pip  # ensures that pip is current
+conda create -n bleurt python=3.7 pip ipython
+conda activate bleurt
+conda install tensorflow-gpu=1.15
 git clone https://github.com/google-research/bleurt.git
 cd bleurt
-pip install .
+pip install -e .
 ```
 
 You may check your install with unit tests:
