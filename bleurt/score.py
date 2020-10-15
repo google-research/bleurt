@@ -23,7 +23,6 @@ from bleurt import encoding
 from bleurt.lib import tokenization
 import tensorflow.compat.v1 as tf
 
-
 flags = tf.flags
 logging = tf.logging
 FLAGS = flags.FLAGS
