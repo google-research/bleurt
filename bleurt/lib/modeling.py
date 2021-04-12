@@ -28,6 +28,7 @@ import math
 import re
 import numpy as np
 import six
+from six.moves import range
 import tensorflow.compat.v1 as tf
 import tf_slim
 

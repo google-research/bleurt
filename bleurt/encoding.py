@@ -16,7 +16,7 @@
 """Data tokenization, encoding and serialization library."""
 import collections
 
-from bleurt.lib import tokenization
+from bleurt.lib import tokenizers
 import numpy as np
 import pandas as pd
 import tensorflow.compat.v1 as tf
@@ -25,6 +25,22 @@ import tensorflow.compat.v1 as tf
 flags = tf.flags
 logging = tf.logging
 FLAGS = flags.FLAGS
+
+
+flags.DEFINE_string(
+    "vocab_file", None, "Vocabulary file for WordPiece tokenization. "
+    "Overridden if `sentence_piece_model` is specified.")
+
+flags.DEFINE_bool(
+    "do_lower_case", None,
+    "Whether to lower case the input text. Should be True for uncased "
+    "models and False for cased models. "
+    "Overridden if `sentence_piece_model` is specified.")
+
+flags.DEFINE_string(
+    "sentence_piece_model", None,
+    "Path to SentencePiece model, without `.model` extension. This flag "
+    "will override `vocab_file` and `do_lower_case`.")
 
 
 def _truncate_seq_pair(tokens_ref, tokens_cand, max_length):
@@ -45,7 +61,7 @@ def encode_example(reference, candidate, tokenizer, max_seq_length):
   Args:
     reference: reference sentence.
     candidate: candidate sentence.
-    tokenizer: BERT-style WordPiece tokenizer.
+    tokenizer: instance of lib.tokenizers.Tokenizer.
     max_seq_length: maximum length of BLEURT's input after tokenization.
 
   Returns:
@@ -134,6 +150,35 @@ def serialize_example(reference,
   return tf_example.SerializeToString()
 
 
+def serialize_raw_example(reference, candidate):
+  """Serializes a pair of sentences into a tf.Example without tokenization.
+
+  Args:
+    reference: reference sentence.
+    candidate: candidate sentence.
+
+  Returns:
+    A serialized tf.Example object.
+  """
+
+  def _bytes_feature(value):
+    """Returns a bytes_list from a string / byte."""
+    if isinstance(value, type(tf.constant(0))):
+      value = value.numpy()
+    return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
+
+  if isinstance(reference, str):
+    reference = reference.encode("utf-8")
+  if isinstance(candidate, str):
+    candidate = candidate.encode("utf-8")
+
+  features = collections.OrderedDict()
+  features["references"] = _bytes_feature(reference)
+  features["candidates"] = _bytes_feature(candidate)
+  tf_example = tf.train.Example(features=tf.train.Features(feature=features))
+  return tf_example.SerializeToString()
+
+
 def encode_batch(references, candidates, tokenizer, max_seq_length):
   """Encodes a batch of sentence pairs to be fed to a BLEURT checkpoint.
 
@@ -159,7 +204,7 @@ def encode_batch(references, candidates, tokenizer, max_seq_length):
 
 
 def encode_and_serialize(input_file, output_file, vocab_file, do_lower_case,
-                         max_seq_length):
+                         sp_model, max_seq_length):
   """Encodes and serializes a set of ratings in JSON format."""
   assert tf.io.gfile.exists(input_file), "Could not find file."
   logging.info("Reading data...")
@@ -172,8 +217,8 @@ def encode_and_serialize(input_file, output_file, vocab_file, do_lower_case,
   logging.info("Read {} examples.".format(n_records))
 
   logging.info("Encoding and writing TFRecord file...")
-  tokenizer = tokenization.FullTokenizer(
-      vocab_file=vocab_file, do_lower_case=do_lower_case)
+  tokenizer = tokenizers.create_tokenizer(
+      vocab_file=vocab_file, do_lower_case=do_lower_case, sp_model=sp_model)
   with tf.python_io.TFRecordWriter(output_file) as writer:
     iterator_id, iterator_cycle = 0, max(int(n_records / 10), 1)
     for record in examples_df.itertuples(index=False):

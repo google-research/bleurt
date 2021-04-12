@@ -28,7 +28,7 @@ candidates = [
     "An apple a day keeps the doctor away.",
     "An apple a day keeps doctors away."
 ]
-ref_scores = [0.832904, 0.642367]
+ref_scores = [0.910811, 0.771989]
 
 
 def get_test_checkpoint():
@@ -43,7 +43,8 @@ class ScoreTest(tf.test.TestCase):
 
   def test_default_bleurt_score(self):
     bleurt = score.BleurtScorer()
-    scores = bleurt.score(references, candidates)
+    scores = bleurt.score(references=references, candidates=candidates)
+    bleurt.close()
     self.assertLen(scores, 2)
     self.assertAllClose(scores, ref_scores)
 
@@ -51,7 +52,7 @@ class ScoreTest(tf.test.TestCase):
     with self.session(graph=tf.Graph()) as session:
       # Creates the TF Graph.
       bleurt_ops = score.create_bleurt_ops()
-      bleurt_scores = bleurt_ops(references, candidates)
+      bleurt_scores = bleurt_ops(references=references, candidates=candidates)
 
       # Runs init.
       init_op = tf.group(tf.global_variables_initializer(),

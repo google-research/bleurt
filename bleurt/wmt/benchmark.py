@@ -45,9 +45,6 @@ flags.DEFINE_bool(
     "Whether all the ratings for the same translation should be averaged "
     "(should be set to False to replicate the results of WMT 18 and 19).")
 
-flags.DEFINE_string("results_json", None,
-                    "[optional] JSON file where the results will be written.")
-
 
 def run_benchmark():
   """Runs the WMT Metrics Benchmark end-to-end."""

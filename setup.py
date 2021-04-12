@@ -23,7 +23,7 @@ with open("README.md", "r") as fh:
   long_description = fh.read()
 
 install_requires = [
-    "pandas", "numpy", "scipy", "tensorflow>=1.15", "tf-slim>=1.1"
+    "pandas", "numpy", "scipy", "tensorflow", "tf-slim>=1.1", "sentencepiece"
 ]
 
 setuptools.setup(
@@ -35,6 +35,9 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/google-research/bleurt",
     packages=setuptools.find_packages(),
+    package_data={
+        "bleurt": ["test_checkpoint/*", "test_checkpoint/variables/*"]
+    },
     classifiers=[
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",

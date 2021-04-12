@@ -18,13 +18,16 @@
 More info about the datasets: https://www.statmt.org/wmt19/metrics-task.html
 """
 import abc
+import collections
 import glob
+import gzip
 import itertools
 import json
 import os
 import re
 import shutil
 import tarfile
+import numpy as np
 
 import six
 import tensorflow.compat.v1 as tf
@@ -48,9 +51,12 @@ WMT_LOCATIONS = {
                       "http://www.computing.dcu.ie/~ygraham/")
     },
     2017: {
-        "full_package":
+        "submissions":
             ("wmt17-metrics-task-no-hybrids", "wmt17-metrics-task-package.tgz",
-             "http://ufallab.ms.mff.cuni.cz/~bojar/")
+             "http://ufallab.ms.mff.cuni.cz/~bojar/"),
+        "eval_data": ("newstest2017-segment-level-human",
+                      "newstest2017-segment-level-human.tar.gz",
+                      "http://computing.dcu.ie/~ygraham/")
     },
     2018: {
         "submissions":
@@ -268,15 +274,16 @@ class Importer17(WMTImporter):
                         "DA-seglevel.csv")
 
   def segments_path(self, subset="root"):
-    """Return the path to the source, reference, and candidate segments.
+    """Return the path to the source, reference, candidate, and raw rating segments.
 
     Args:
-      subset: one if "root", "source", "reference", or "candidate".
+      subset: one if "root", "source", "reference", "candidate", or
+        "raw_rating".
 
     Returns:
       Path to the relevant folder.
     """
-    assert subset in ["root", "source", "reference", "candidate"]
+    assert subset in ["root", "source", "reference", "candidate", "raw_rating"]
     root_dir = os.path.join(self.temp_directory, "extracted_wmt_package")
     if subset == "root":
       return root_dir
@@ -289,6 +296,8 @@ class Importer17(WMTImporter):
     elif subset == "candidate":
       return os.path.join(root_dir, "wmt17-submitted-data", "txt",
                           "system-outputs", "newstest2017")
+    elif subset == "raw_rating":
+      return os.path.join(root_dir, "newstest2017-segment-level-human")
 
   def fetch_files(self):
     """Downloads the WMT eval files."""
@@ -324,8 +333,10 @@ class Importer17(WMTImporter):
     src_subfolder = self.segments_path("source")
     ref_subfolder = self.segments_path("reference")
     src_lang, tgt_lang = separate_lang_pair(lang)
-    src_file = "newstest2017-{}{}-src.{}".format(src_lang, tgt_lang, src_lang)
-    ref_file = "newstest2017-{}{}-ref.{}".format(src_lang, tgt_lang, tgt_lang)
+    src_file = "newstest2017-{src}{tgt}-src.{lang}".format(
+        src=src_lang, tgt=tgt_lang, lang=src_lang)
+    ref_file = "newstest2017-{src}{tgt}-ref.{lang}".format(
+        src=src_lang, tgt=tgt_lang, lang=tgt_lang)
     src_path = os.path.join(src_subfolder, src_file)
     ref_path = os.path.join(ref_subfolder, ref_file)
 
@@ -374,21 +385,50 @@ class Importer17(WMTImporter):
         len(sys_segments.keys())))
     return sys_segments
 
+  def get_raw_rating_scores(self, lang):
+    """Builds a dictionary with the rating score for each segment."""
+    # Gets the raw ratings file path.
+    folder_name, _, _ = self.location_info["eval_data"]
+    raw_rating_path = os.path.join(self.temp_directory, folder_name,
+                                   "anon-proc-hits-seg-{}".format(lang[-2:]),
+                                   "analysis", "ad-seg-scores.csv.gz")
+    logging.info("Reading raw ratings from {}".format(raw_rating_path))
+
+    # Extracts the raw rating segments.
+    with gzip.open(raw_rating_path, "rt") as f_raw_ratings:
+      raw_rating_lines = f_raw_ratings.readlines()
+    # Each column in ratings file is separated by spaces.
+    raw_rating_lines = [
+        postprocess_segment(s).split() for s in raw_rating_lines
+    ]
+    # Filter out ratings for other language pairs.
+    check_lang = lambda x: "-".join([x[0], x[1]]) == lang
+    raw_rating_lines = list(filter(check_lang, raw_rating_lines))
+    # Create tuple from seg_id (index 5) to raw_rating (index 7).
+    raw_ratings = collections.defaultdict(list)
+    for x in raw_rating_lines:
+      raw_ratings[int(x[5])].append(float(x[7]))
+
+    # If there are multiple ratings, the final rating is averaged.
+    for key, value in raw_ratings.items():
+      raw_ratings[key] = np.mean(value)
+    return raw_ratings
+
   def parse_rating(self, line):
     fields = line.split()
     lang = fields[0]
     sys_names = fields[2].split("+")
     seg_id = int(fields[3])
     z_score = float(fields[4])
-    raw_score = None
     for sys_name in sys_names:
-      yield lang, sys_name, seg_id, raw_score, z_score
+      yield lang, sys_name, seg_id, z_score
 
   def generate_records_for_lang(self, lang):
     """Consolidates all the files for a given language pair and year."""
-    # Loads source, reference and system segments.
+    # Loads source, reference, system segments, and raw ratings.
     src_segments, ref_segments = self.get_ref_segments(lang)
     sys_segments = self.get_sys_segments(lang)
+    raw_rating_scores = self.get_raw_rating_scores(lang)
 
     # Streams the rating file and performs the join on-the-fly.
     ratings_file_path = self.agg_ratings_path()
@@ -398,16 +438,19 @@ class Importer17(WMTImporter):
       with open(self.target_file, "a+") as dest_file:
         for line in itertools.islice(f_ratings, 1, None):
           for parsed_line in self.parse_rating(line):
-            line_lang, sys_name, seg_id, raw_score, z_score = parsed_line
+            line_lang, sys_name, seg_id, z_score = parsed_line
             if line_lang != lang:
               continue
             # The "-1" is necessary because seg_id starts counting at 1.
             src_segment = src_segments[seg_id - 1]
             ref_segment = ref_segments[seg_id - 1]
             sys_segment = sys_segments[sys_name][seg_id - 1]
+            # Directly use seg_id because seg_id is key here, not an index.
+            raw_rating_score = raw_rating_scores[seg_id]
             example = Importer18.to_json(self.year, lang, src_segment,
-                                         ref_segment, sys_segment, raw_score,
-                                         z_score, seg_id, sys_name)
+                                         ref_segment, sys_segment,
+                                         raw_rating_score, z_score, seg_id,
+                                         sys_name)
             dest_file.write(example)
             dest_file.write("\n")
             n_records += 1
@@ -455,8 +498,10 @@ class Importer18(WMTImporter):
     src_subfolder = os.path.join("sources")
     ref_subfolder = os.path.join("references")
     src_lang, tgt_lang = separate_lang_pair(lang)
-    src_file = "newstest2018-{}{}-src.{}".format(src_lang, tgt_lang, src_lang)
-    ref_file = "newstest2018-{}{}-ref.{}".format(src_lang, tgt_lang, tgt_lang)
+    src_file = "newstest2018-{src}{tgt}-src.{lang}".format(
+        src=src_lang, tgt=tgt_lang, lang=src_lang)
+    ref_file = "newstest2018-{src}{tgt}-ref.{lang}".format(
+        src=src_lang, tgt=tgt_lang, lang=tgt_lang)
     src_path = os.path.join(self.temp_directory, folder, src_subfolder,
                             src_file)
     ref_path = os.path.join(self.temp_directory, folder, ref_subfolder,
@@ -685,8 +730,10 @@ class Importer19(Importer18):
     src_subfolder = os.path.join("txt", "sources")
     ref_subfolder = os.path.join("txt", "references")
     src_lang, tgt_lang = separate_lang_pair(lang)
-    src_file = "newstest2019-{}{}-src.{}".format(src_lang, tgt_lang, src_lang)
-    ref_file = "newstest2019-{}{}-ref.{}".format(src_lang, tgt_lang, tgt_lang)
+    src_file = "newstest2019-{src}{tgt}-src.{lang}".format(
+        src=src_lang, tgt=tgt_lang, lang=src_lang)
+    ref_file = "newstest2019-{src}{tgt}-ref.{lang}".format(
+        src=src_lang, tgt=tgt_lang, lang=tgt_lang)
     src_path = os.path.join(self.temp_directory, folder, src_subfolder,
                             src_file)
     ref_path = os.path.join(self.temp_directory, folder, ref_subfolder,

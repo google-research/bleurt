@@ -46,8 +46,11 @@ flags.DEFINE_string(
 # See model.py and lib/experiment_utils.py for other important flags.
 
 
-def run_finetuning_pipeline(train_set, dev_set):
+def run_finetuning_pipeline(train_set, dev_set, run_in_lazy_mode=True):
   """Runs the full BLEURT fine-tuning pipeline."""
+
+  if run_in_lazy_mode:
+    tf.disable_eager_execution()
 
   bleurt_params = checkpoint_lib.get_bleurt_params_from_flags_or_ckpt()
 
@@ -62,6 +65,7 @@ def run_finetuning_pipeline(train_set, dev_set):
       train_tfrecord,
       vocab_file=bleurt_params["vocab_file"],
       do_lower_case=bleurt_params["do_lower_case"],
+      sp_model=bleurt_params["sp_model"],
       max_seq_length=bleurt_params["max_seq_length"])
 
   logging.info("*** Running pre-processing pipeline for eval examples.")
@@ -74,6 +78,7 @@ def run_finetuning_pipeline(train_set, dev_set):
       dev_tfrecord,
       vocab_file=bleurt_params["vocab_file"],
       do_lower_case=bleurt_params["do_lower_case"],
+      sp_model=bleurt_params["sp_model"],
       max_seq_length=bleurt_params["max_seq_length"])
 
   # Actual fine-tuning work.
@@ -96,11 +101,15 @@ def run_finetuning_pipeline(train_set, dev_set):
   export_dir = export_dirs[0]
 
   # Finalizes the BLEURT checkpoint.
+  logging.info("Exporting BLEURT checkpoint to {}.".format(export_dir))
   checkpoint_lib.finalize_bleurt_checkpoint(export_dir)
+
   return export_dir
 
 
 def main(_):
+  if FLAGS.dynamic_seq_length:
+    tf.disable_eager_execution()
   assert FLAGS.train_set, "Need to specify a train set."
   assert FLAGS.dev_set, "Need to specify a dev set."
   run_finetuning_pipeline(FLAGS.train_set, FLAGS.dev_set)

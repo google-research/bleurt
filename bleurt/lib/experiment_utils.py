@@ -33,16 +33,16 @@ flags.DEFINE_integer("tf_random_seed", None, "Random seed for tensorflow")
 flags.DEFINE_integer("num_eval_steps", None,
                      "Number of steps to take during evaluation.")
 
-flags.DEFINE_integer("num_train_steps", None,
+flags.DEFINE_integer("num_train_steps", 25000,
                      "Number of steps to take during training.")
 
 flags.DEFINE_integer("save_checkpoints_steps", 1000,
                      "Number of steps between checkpoint saves.")
 
-flags.DEFINE_integer("eval_throttle_secs", 600,
+flags.DEFINE_integer("eval_throttle_secs", 0,
                      "Minimum number of seconds to wait between evaluations")
 
-flags.DEFINE_integer("eval_start_delay_secs", 120,
+flags.DEFINE_integer("eval_start_delay_secs", 0,
                      "Number of seconds to wait before starting evaluations.")
 
 flags.DEFINE_integer("keep_checkpoint_max", 5,

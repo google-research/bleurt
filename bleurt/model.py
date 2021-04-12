@@ -14,14 +14,15 @@
 # limitations under the License.
 # Lint as: python3
 """BLEURT's Tensorflow ops."""
+
 from bleurt import checkpoint as checkpoint_lib
-from bleurt.lib import modeling
 from bleurt.lib import optimization
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v1 as tf
 
 from tf_slim import metrics
+from bleurt.lib import modeling
 
 flags = tf.flags
 logging = tf.logging
@@ -44,19 +45,14 @@ flags.DEFINE_string(
     "The config json file corresponding to the pre-trained BERT model. "
     "This specifies the model architecture.")
 
-flags.DEFINE_string("vocab_file", None,
-                    "The vocabulary file that the BERT model was trained on.")
-
-flags.DEFINE_bool(
-    "do_lower_case", True,
-    "Whether to lower case the input text. Should be True for uncased "
-    "models and False for cased models.")
-
 flags.DEFINE_integer(
-    "max_seq_length", 128,
+    "max_seq_length", None,
     "The maximum total input sequence length after WordPiece tokenization. "
     "Sequences longer than this will be truncated, and sequences shorter "
     "than this will be padded.")
+
+flags.DEFINE_bool("dynamic_seq_length", False,
+                  "Exports model with dymaic sequence length.")
 
 # Flags to control training setup.
 flags.DEFINE_enum("export_metric", "kendalltau", ["correlation", "kendalltau"],
@@ -342,7 +338,13 @@ def input_fn_builder(tfrecord_file,
 
   def input_fn(params):  # pylint: disable=unused-argument
     """Acutal data generator."""
-    d = tf.data.TFRecordDataset(tfrecord_file)
+    tfrecord_file_expanded = tf.io.gfile.glob(tfrecord_file)
+    n_files = len(tfrecord_file_expanded)
+    if n_files > 1:
+      logging.info("Found {} files matching {}".format(
+          str(n_files), tfrecord_file))
+
+    d = tf.data.TFRecordDataset(tfrecord_file_expanded)
     if is_training:
       d = d.repeat()
       d = d.shuffle(buffer_size=FLAGS.shuffle_buffer_size)
@@ -369,11 +371,20 @@ def _serving_input_fn_builder(seq_length):
         "input_mask": tf.zeros(dtype=tf.int64, shape=[0, seq_length]),
         "segment_ids": tf.zeros(dtype=tf.int64, shape=[0, seq_length])
     }
-  else:
+  elif not tf.executing_eagerly() and not FLAGS.dynamic_seq_length:
     name_to_features = {
         "input_ids": tf.placeholder(tf.int64, shape=[None, seq_length]),
         "input_mask": tf.placeholder(tf.int64, shape=[None, seq_length]),
         "segment_ids": tf.placeholder(tf.int64, shape=[None, seq_length])
+    }
+  elif FLAGS.dynamic_seq_length:
+    assert not tf.executing_eagerly(), \
+        "Training with `dynamic_seq_length` is not supported in Eager mode."
+    logging.info("Exporting a model with dynamic sequence length.")
+    name_to_features = {
+        "input_ids": tf.placeholder(tf.int64, shape=[None, None]),
+        "input_mask": tf.placeholder(tf.int64, shape=[None, None]),
+        "segment_ids": tf.placeholder(tf.int64, shape=[None, None])
     }
   return tf.estimator.export.build_raw_serving_input_receiver_fn(
       name_to_features)

@@ -39,9 +39,11 @@ def get_bleurt_params_from_flags_or_ckpt():
     logging.info("Reads parameters from flags.")
     vocab_file = config["vocab_file"]
     do_lower_case = config["do_lower_case"]
+    sp_model = config["sp_model"]
     max_seq_length = config["max_seq_length"]
     bert_config_file = config["bert_config_file"]
     init_checkpoint = config["tf_checkpoint_variables"]
+    dynamic_seq_length = config["dynamic_seq_length"]
 
     # The following test gives the user the option to override `max_seq_length`.
     # This should only be used during fine-tuning.
@@ -52,23 +54,29 @@ def get_bleurt_params_from_flags_or_ckpt():
 
   else:
     logging.info("Reads parameters from flags.")
-    assert FLAGS.vocab_file, "vocab_file missing"
+    assert ((FLAGS.vocab_file and FLAGS.do_lower_case is not None) or
+            FLAGS.sentence_piece_model), \
+           ("Missing tokenization information. Please specify `vocab file` and "
+            "`do_lower_case` or `sentence_piece_model`")
     vocab_file = FLAGS.vocab_file
-    assert FLAGS.do_lower_case, "do_lower_case missing"
     do_lower_case = FLAGS.do_lower_case
+    sp_model = FLAGS.sentence_piece_model
     assert FLAGS.max_seq_length, "max_seq_length missing"
     max_seq_length = FLAGS.max_seq_length
     assert FLAGS.bert_config_file, "config_file missing"
     bert_config_file = FLAGS.bert_config_file
     assert FLAGS.init_checkpoint, "init_checkpoint missing"
     init_checkpoint = FLAGS.init_checkpoint
+    dynamic_seq_length = FLAGS.dynamic_seq_length
 
   return {
       "vocab_file": vocab_file,
       "do_lower_case": do_lower_case,
+      "sp_model": sp_model,
       "max_seq_length": max_seq_length,
       "bert_config_file": bert_config_file,
-      "init_checkpoint": init_checkpoint
+      "init_checkpoint": init_checkpoint,
+      "dynamic_seq_length": dynamic_seq_length
   }
 
 
@@ -80,26 +88,46 @@ def read_bleurt_config(path):
   assert tf.io.gfile.exists(config_path), \
       ("Could not find BLEURT config file {}. Are you sure {}"
        " is a valid checkpoint?").format(config_path, path)
-  logging.info("Config file found, reading.")
 
+  logging.info("Config file found, reading.")
   with tf.io.gfile.GFile(config_path, "r") as f:
     raw_config = f.read()
   bleurt_config = json.loads(raw_config)
   logging.info("Will load checkpoint {}".format(bleurt_config["name"]))
 
-  logging.info("Performs basic checks...")
+  logging.info("Loads full paths and checks that files exists.")
   for k in bleurt_config:
+
     v = bleurt_config[k]
     logging.info("... {}:{}".format(k, v))
     if not isinstance(v, str):
       continue
+
     if k.endswith("_file") or k.endswith("_dir"):
       fname = os.path.join(path, bleurt_config[k])
       assert tf.io.gfile.exists(fname), "File {} missing.".format(fname)
       bleurt_config[k] = fname
 
+    if k == "sp_model":
+      fname = os.path.join(path, bleurt_config[k] + ".model")
+      assert tf.io.gfile.exists(fname), "File {} missing.".format(fname)
+      fname = os.path.join(path, bleurt_config[k] + ".vocab")
+      assert tf.io.gfile.exists(fname), "File {} missing.".format(fname)
+      bleurt_config[k] = os.path.join(path, bleurt_config[k])
+
   bleurt_config["chkpt_dir"] = path
   bleurt_config["tf_checkpoint_variables"] = os.path.join(path, WEIGHTS_FILE)
+
+  # Necessary for retro-compatilibity with models that were trained before
+  # SentencePiece was introduced.
+  if "sp_model" not in bleurt_config:
+    bleurt_config["sp_model"] = None
+
+  # Necessary for retro-compatilibity with models that were trained before
+  # UniformBatchScoring was introduced.
+  if "dynamic_seq_length" not in bleurt_config:
+    bleurt_config["dynamic_seq_length"] = False
+
   return bleurt_config
 
 
@@ -109,17 +137,39 @@ def finalize_bleurt_checkpoint(tf_export_path):
   assert tf.io.gfile.exists(tf_export_path), "SavedModel export not found!"
 
   bleurt_params = get_bleurt_params_from_flags_or_ckpt()
-  vocab_file = os.path.join(tf_export_path, "vocab.txt")
-  tf.io.gfile.copy(bleurt_params["vocab_file"], vocab_file, overwrite=True)
+
+  # Creates local copies of auxiliary files--BERT config, vocab file, etc.
   bert_config_file = os.path.join(tf_export_path, "bert_config.json")
   tf.io.gfile.copy(
       bleurt_params["bert_config_file"], bert_config_file, overwrite=True)
+
+  if bleurt_params["vocab_file"]:
+    vocab_copy_loc = os.path.join(tf_export_path, "vocab.txt")
+    tf.io.gfile.copy(
+        bleurt_params["vocab_file"], vocab_copy_loc, overwrite=True)
+    vocab_val = "vocab.txt"
+    do_lower_case_val = bleurt_params["do_lower_case"]
+    sp_model_val = None
+
+  elif bleurt_params["sp_model"]:
+    sp_copy_loc = os.path.join(tf_export_path, "sent_piece.model")
+    tf.io.gfile.copy(
+        bleurt_params["sp_model"] + ".model", sp_copy_loc, overwrite=True)
+    vocab_copy_loc = os.path.join(tf_export_path, "sent_piece.vocab")
+    tf.io.gfile.copy(
+        bleurt_params["sp_model"] + ".vocab", vocab_copy_loc, overwrite=True)
+    vocab_val = None
+    do_lower_case_val = None
+    sp_model_val = "sent_piece"
+
   bleurt_config = {
       "name": FLAGS.bleurt_checkpoint_name,
-      "vocab_file": "vocab.txt",
       "bert_config_file": "bert_config.json",
-      "do_lower_case": bleurt_params["do_lower_case"],
-      "max_seq_length": bleurt_params["max_seq_length"]
+      "max_seq_length": bleurt_params["max_seq_length"],
+      "vocab_file": vocab_val,
+      "do_lower_case": do_lower_case_val,
+      "sp_model": sp_model_val,
+      "dynamic_seq_length": bleurt_params["dynamic_seq_length"]
   }
   config_string = json.dumps(bleurt_config)
   config_file = os.path.join(tf_export_path, "bleurt_config.json")

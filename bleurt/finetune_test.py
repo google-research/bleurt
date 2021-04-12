@@ -52,14 +52,14 @@ class FinetuneTest(tf.test.TestCase):
                            FLAGS.num_train_steps, FLAGS.serialized_train_set,
                            FLAGS.serialized_dev_set, FLAGS.init_checkpoint,
                            FLAGS.bert_config_file, FLAGS.vocab_file,
-                           FLAGS.max_seq_length)
+                           FLAGS.max_seq_length, FLAGS.do_lower_case)
 
   def tearDown(self):
     # Restores default FLAG values.
     (FLAGS.init_bleurt_checkpoint, FLAGS.model_dir, FLAGS.num_train_steps,
      FLAGS.serialized_train_set, FLAGS.serialized_dev_set,
      FLAGS.init_checkpoint, FLAGS.bert_config_file, FLAGS.vocab_file,
-     FLAGS.max_seq_length) = self._old_flags_val
+     FLAGS.max_seq_length, FLAGS.do_lower_case) = self._old_flags_val
     super(FinetuneTest, self).tearDown()
 
   def test_finetune_from_bleurt(self):
@@ -109,10 +109,12 @@ class FinetuneTest(tf.test.TestCase):
 
     with tempfile.TemporaryDirectory() as model_dir:
       # Sets new flags.
+      FLAGS.model_dir = model_dir
       FLAGS.init_checkpoint = os.path.join(checkpoint, "variables", "variables")
       FLAGS.bert_config_file = os.path.join(checkpoint, "bert_config.json")
       FLAGS.vocab_file = os.path.join(checkpoint, "vocab.txt")
-      FLAGS.model_dir = model_dir
+      FLAGS.do_lower_case = True
+      FLAGS.max_seq_length = 512
       FLAGS.num_train_steps = 1
       FLAGS.serialized_train_set = os.path.join(model_dir, "train.tfrecord")
       FLAGS.serialized_dev_set = os.path.join(model_dir, "dev.tfrecord")

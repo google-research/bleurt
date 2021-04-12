@@ -19,7 +19,6 @@ More info about the datasets: https://www.statmt.org/wmt19/metrics-task.html
 """
 import os
 import tempfile
-
 from bleurt.wmt import downloaders
 import pandas as pd
 import tensorflow.compat.v1 as tf
@@ -55,7 +54,6 @@ flags.DEFINE_string(
 flags.DEFINE_string(
     "temp_directory", None, "[optional] Temporary directory where WMT archives "
     "will be downladed and untared.")
-
 
 # Post-processing.
 flags.DEFINE_float("dev_ratio", None,
@@ -140,9 +138,19 @@ def postprocess(target_file, remove_null_refs=True, average_duplicates=True):
     assert not ratings_df.empty
 
   if average_duplicates:
+    logging.warning(
+        "*** WARNING! Averaging duplicates will collapse system names for the same candidate and reference pair, leaving only the first system name in the resulting file. This behavior is non-deterministic and may result in inaccurate results."
+    )
     ratings_df = ratings_df.groupby(by=["lang", "candidate", "reference"]).agg({
+        "source": "first",
+        "year": "first",
+        "n_ratings": "first",
+        "system": "first",
+        "segment_id": "first",
+        "raw_rating": "mean",
         "score": "mean",
     }).reset_index()
+    ratings_df = ratings_df.sort_values(["lang", "reference", "candidate"])
 
   logging.info("Saving clean file.")
   with tf.io.gfile.GFile(target_file, "w+") as f:
