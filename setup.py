@@ -28,7 +28,7 @@ install_requires = [
 
 setuptools.setup(
     name="BLEURT",  # Replace with your own username
-    version="0.0.1",
+    version="0.0.2",
     author="The Google AI Language Team",
     description="The BLEURT metric for Natural Language Generation.",
     long_description=long_description,
