@@ -28,24 +28,17 @@ import unicodedata
 import six
 import tensorflow.compat.v1 as tf
 
-flags = tf.flags
 logging = tf.logging
-FLAGS = flags.FLAGS
 
-
-# The flag was renamed from `preserve_unused_tokens` to
-# `bert_preserve_unused_tokens` to avoid conflicts.
-flags.DEFINE_bool(
-    "bert_preserve_unused_tokens", False,
-    "If True, Wordpiece tokenization will not be applied to words in the vocab."
-)
+# This used to be a flag in the original BERT version.
+PRESERVE_UNUSED_TOKENS = False
 
 _UNUSED_TOKEN_RE = re.compile("^\\[unused\\d+\\]$")
 
 
 def preserve_token(token, vocab):
   """Returns True if the token should forgo tokenization and be preserved."""
-  if not FLAGS.bert_preserve_unused_tokens:
+  if not PRESERVE_UNUSED_TOKENS:
     return False
   if token not in vocab:
     return False

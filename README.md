@@ -26,6 +26,7 @@ You may check your install with unit tests:
 python -m unittest bleurt.score_test
 python -m unittest bleurt.score_not_eager_test
 python -m unittest bleurt.finetune_test
+python -m unittest bleurt.score_files_test
 ```
 
 ## Using BLEURT - TL;DR Version

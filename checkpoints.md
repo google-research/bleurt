@@ -5,7 +5,9 @@ This page provides additional details and links about BLEURT checkpoints.
 
 ## Overview
 
-A BLEURT checkpoint is a folder that contains a TensorFlow regression model, along with some config files and resources that the model needs to run.
+A BLEURT checkpoint is a folder that contains a TensorFlow regression model, along with some resources that the model needs to run. Technically, it is a [Tensorflow SavedModel](https://www.tensorflow.org/guide/saved_model#savedmodels_from_estimators)
+with a `bleurt_config.json` file that defines some parmeters for BLEURT. It also contains two additional files required by BERT, the dictionary `vocab.txt` and the parameters files `bert_config.json`.
+
 
 Currently, the following six BLEURT checkpoints are available, fine-tuned on [WMT Metrics ratings data from 2015 to 2018](http://www.statmt.org/wmt19/metrics-task.html). They vary on two aspects: the size of the model, and the size of the input. The bigger the model, the more accurately it models human ratings, but the more resources it needs. If you don't know where to start, we recommend using BLEURT-base with 128 tokens.
 
@@ -136,9 +138,3 @@ explained in our [ACL paper](https://arxiv.org/abs/2004.04696). You may find the
 [BERT-tiny](https://storage.googleapis.com/bleurt-oss/bert-tiny-midtrained.zip) |
 [BERT-base](https://storage.googleapis.com/bleurt-oss/bert-base-midtrained.zip) |
 [BERT-large](https://storage.googleapis.com/bleurt-oss/bert-large-midtrained.zip) |
-
-
-### What's in a BLEURT checkpoint?
-
-Technically, a checkpoint is a [Tensorflow SavedModel](https://www.tensorflow.org/guide/saved_model#savedmodels_from_estimators)
-with a `bleurt_config.json` file that defines some parmeters for BLEURT. It also contains two additional files required by BERT, the dictionary `vocab.txt` and the parameters files `bert_config.json`.
