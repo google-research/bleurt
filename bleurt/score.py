@@ -122,7 +122,7 @@ class PythonPredictor(Predictor):
   """Wrapper around a Python function."""
 
   def __init__(self, predict_fn):
-    tf.logging.info("Creating Python-based predictor.")
+    logging.info("Creating Python-based predictor.")
     self.predict_fn = predict_fn
 
   def predict(self, input_dict):
