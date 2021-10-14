@@ -83,7 +83,8 @@ def grouped_wmt_kendall(df, year=2019, threshold=25):
     local_agreement, local_n_pairs, local_n_skipped = wmt_kendall(
         group_df, year, threshold, return_counts=True)
     if local_agreement is None or local_n_pairs is None or n_skipped is None:
-      return None
+      # return None
+      continue
     agreement += local_agreement
     n_pairs += local_n_pairs
     n_skipped += local_n_skipped
@@ -233,6 +234,7 @@ WMT_OUTLIERS = {
 
 
 def eval_checkpoint(export_dir, test_file, results_json=None):
+  """Runs evaluation on a BLEURT checkpoint."""
 
   def _scoring_fun(test_df):
     scorer = score.BleurtScorer(export_dir)
@@ -243,46 +245,75 @@ def eval_checkpoint(export_dir, test_file, results_json=None):
   return run_eval(_scoring_fun, test_file, results_json)
 
 
-def predict_from_file(path_to_file, test_data_df, filter_newstest=True):
-  """Obtains predictions from a file, provided by WMT."""
-  tf.logging.info("Evaluating file {}".format(path_to_file))
-  col_names = [
-      "metric", "lang", "corpus", "system", "segment_id", "prediction", "ens",
-      "url"
-  ]
-  baseline_df = pd.read_csv(
-      tf.gfile.Open(path_to_file), sep="\t", names=col_names)
-  tf.logging.info(baseline_df.head())
-
-  if filter_newstest:
-    baseline_df = baseline_df.loc[
-        baseline_df["corpus"].str.startswith("newstest"), :]
-
-  join_df = test_data_df.merge(
-      baseline_df, how="left", on=["system", "segment_id", "lang"], sort=False)
-
-  # Checks that the join preserves the order of the rows.
-  assert join_df["score"].count() == test_data_df["score"].count()
-  assert np.all(join_df["score"].to_numpy() == test_data_df["score"].to_numpy())
-
-  predictions = join_df["prediction"]
-  n_nulls = predictions.isna().sum()
-  if n_nulls > 0:
-    tf.logging.warning("Found {} nulls in baseline".format(n_nulls))
-  return predictions.tolist()
-
-
-def eval_prediction_file(prediction_file, test_file, results_json=None):
+def eval_tf_export(export_dir, test_file, results_json=None):
+  """Runs evaluation on a SavedModel with in-graph tokenization."""
+  bleurt_scorer = score.SavedModelBleurtScorer(export_dir)
 
   def _scoring_fun(test_df):
-    assert tf.io.gfile.exists(prediction_file), \
-        "Could not find prediction file."
-    return predict_from_file(prediction_file, test_df)
+    scores = bleurt_scorer.score(
+        references=test_df.reference, candidates=test_df.candidate)
+    return scores
 
   return run_eval(_scoring_fun, test_file, results_json)
 
 
-def run_eval(scoring_fun, test_file, results_json=None):
+def eval_prediction_file(prediction_file,
+                         test_file,
+                         results_json=None,
+                         wmt_format=True,
+                         exclude_sys=None):
+  """Runs evaluation on a prediction file, possibly in WMT format."""
+
+  tf.logging.info("Evaluating file {}".format(prediction_file))
+  assert tf.io.gfile.exists(prediction_file), "Could not find file."
+
+  def _predict_from_file(test_data_df, filter_newstest=True):
+
+    tf.logging.info("Reading input file.")
+
+    if wmt_format:
+      # Reads a file with format WMT 15 to 19.
+      col_names = [
+          "metric", "lang", "corpus", "system", "segment_id", "prediction",
+          "ens", "url"
+      ]
+      predictions_df = pd.read_csv(
+          tf.gfile.Open(prediction_file), sep="\t", names=col_names)
+      if filter_newstest:
+        predictions_df = predictions_df.loc[
+            predictions_df["corpus"].str.startswith("newstest"), :]
+    else:
+      # Reads a file with free TSV format. The expectation is that the file
+      # contains column names, including "system", "segment_id", and "lang".
+      predictions_df = pd.read_csv(tf.gfile.Open(prediction_file), sep="\t")
+      for col in ["lang", "system", "segment_id"]:
+        assert col in predictions_df.columns
+
+    tf.logging.info("Done reading input file.")
+    tf.logging.info(predictions_df.head())
+
+    # Joins with ratings data.
+    join_df = test_data_df.merge(
+        predictions_df,
+        how="left",
+        on=["system", "segment_id", "lang"],
+        sort=False)
+    assert join_df["score"].count() == test_data_df["score"].count()
+    assert np.all((
+        join_df["score"].to_numpy() == test_data_df["score"].to_numpy())
+                  | np.isnan(join_df["score"].to_numpy()))
+
+    predictions = join_df["prediction"]
+    n_nulls = predictions.isna().sum()
+    if n_nulls > 0:
+      tf.logging.warning("Found {} nulls in baseline".format(n_nulls))
+
+    return predictions.tolist()
+
+  return run_eval(_predict_from_file, test_file, results_json, exclude_sys)
+
+
+def run_eval(scoring_fun, test_file, results_json=None, exclude_sys=None):
   """Computes correlations between BLEURT and human ratings on all pairs of languages."""
 
   assert tf.io.gfile.exists(test_file), "Could not find test file."
@@ -311,15 +342,24 @@ def run_eval(scoring_fun, test_file, results_json=None):
   bleurt_scores = scoring_fun(test_df)
   assert len(bleurt_scores) == n_items
   logging.info("Done.")
+  test_df["bleurt"] = bleurt_scores
+
+  if exclude_sys:
+    tf.logging.info("Excluding systems matching: {}.".format(exclude_sys))
+    tf.logging.info("Num rows before: {}.".format(len(test_df.index)))
+    test_df = test_df[~test_df["system"].str.match(exclude_sys)]
+    tf.logging.info("Num rows after: {}.".format(len(test_df.index)))
 
   logging.info("Computing correlations.")
-  test_df["bleurt"] = bleurt_scores
   year = test_df["year"].unique()[0]
   grouped_by_lang = test_df.groupby(by=["lang"])
   results = collections.defaultdict(dict)
 
   for group_name, group_df in grouped_by_lang:
     logging.info("* {}:".format(group_name))
+
+    systems = group_df["system"].unique()
+    tf.logging.info("sytems: {}".format(" ".join(systems)))
 
     # Segment-level correlations.
     predictions = group_df["bleurt"].to_numpy()

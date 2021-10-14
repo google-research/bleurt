@@ -26,6 +26,8 @@ import tensorflow.compat.v1 as tf
 
 flags.DEFINE_integer("batch_size", 16, "Batch size.")
 
+flags.DEFINE_integer("eval_batch_size", 16, "Evaluation batch size.")
+
 flags.DEFINE_string("model_dir", None, "Model directory")
 
 flags.DEFINE_integer("tf_random_seed", None, "Random seed for tensorflow")
@@ -51,7 +53,11 @@ flags.DEFINE_integer("keep_checkpoint_max", 5,
 FLAGS = flags.FLAGS
 
 
-def run_experiment(model_fn, train_input_fn, eval_input_fn, exporters=None):
+def run_experiment(model_fn,
+                   train_input_fn,
+                   eval_input_fn,
+                   additional_eval_specs=None,
+                   exporters=None):
   """Run experiment."""
   run_config = tf.estimator.RunConfig(
       model_dir=FLAGS.model_dir,
@@ -62,6 +68,8 @@ def run_experiment(model_fn, train_input_fn, eval_input_fn, exporters=None):
       config=run_config, model_fn=model_fn, model_dir=FLAGS.model_dir)
   train_spec = tf.estimator.TrainSpec(
       input_fn=train_input_fn, max_steps=FLAGS.num_train_steps)
+  assert not additional_eval_specs, (
+      "Multiple eval sets are not supported with default experiment runner.")
   eval_spec = tf.estimator.EvalSpec(
       name="default",
       input_fn=eval_input_fn,

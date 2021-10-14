@@ -151,7 +151,8 @@ def score_files(generator, bleurt_checkpoint):
   logging.info("Done.")
 
 
-def main(_):
+def check_flags_and_score():
+  """Creates a file reader and runs model."""
   assert FLAGS.sentence_pairs_file or (
       FLAGS.reference_file and FLAGS.candidate_file
   ), ("Reference and candidate files not found, please specify a JSONL file or "
@@ -162,6 +163,11 @@ def main(_):
     sentence_pairs_generator = _text_generator(FLAGS.reference_file,
                                                FLAGS.candidate_file)
   score_files(sentence_pairs_generator, FLAGS.bleurt_checkpoint)
+
+
+def main(_):
+  logging.info("Running BLEURT scoring.")
+  check_flags_and_score()
 
 
 if __name__ == "__main__":

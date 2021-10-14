@@ -109,6 +109,7 @@ def run_finetuning_pipeline(train_set, dev_set, run_in_lazy_mode=True):
 
 def main(_):
   if FLAGS.dynamic_seq_length:
+    logging.info("Dynamic seq length requested - disabling Eager Mode.")
     tf.disable_eager_execution()
   assert FLAGS.train_set, "Need to specify a train set."
   assert FLAGS.dev_set, "Need to specify a dev set."

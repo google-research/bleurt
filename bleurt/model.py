@@ -51,7 +51,7 @@ flags.DEFINE_integer(
     "Sequences longer than this will be truncated, and sequences shorter "
     "than this will be padded.")
 
-flags.DEFINE_bool("dynamic_seq_length", False,
+flags.DEFINE_bool("dynamic_seq_length", True,
                   "Exports model with dymaic sequence length.")
 
 # Flags to control training setup.
@@ -72,6 +72,10 @@ flags.DEFINE_float(
     "Proportion of training to perform linear learning rate warmup for. "
     "E.g., 0.1 = 10% of training.")
 
+flags.DEFINE_bool(
+    "use_ranking_loss", False,
+    "Whether to use a ranking loss instead of regression (l2 loss).")
+
 # BLEURT model flags.
 flags.DEFINE_integer("n_hidden_layers", 0,
                      "Number of fully connected/RNN layers before prediction.")
@@ -80,6 +84,9 @@ flags.DEFINE_integer("hidden_layers_width", 128, "Width of hidden layers.")
 
 flags.DEFINE_float("dropout_rate", 0,
                    "Probability of dropout over BERT embedding.")
+
+
+flags.DEFINE_float("random_seed", 55555, "Random seed for TensorFlow.")
 
 
 def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
@@ -136,7 +143,10 @@ def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
   # <float32>[batch_size]
   predictions = tf.squeeze(predictions, 1)
   # <float32>[batch_size]
-  per_example_loss = tf.pow(predictions - labels, 2)
+  if FLAGS.use_ranking_loss:
+    per_example_loss = ranking_loss(predictions, labels)
+  else:
+    per_example_loss = tf.pow(predictions - labels, 2)
   # <float32> []
   loss = tf.reduce_mean(per_example_loss, axis=-1)
 
@@ -153,7 +163,7 @@ def model_fn_builder(bert_config, init_checkpoint, learning_rate,
     """The `model_fn` for Estimator/TPUEstimator."""
 
     logging.info("*** Building Regression BERT Model ***")
-    tf.set_random_seed(55555)
+    tf.set_random_seed(FLAGS.random_seed)
 
     logging.info("*** Features ***")
     for name in sorted(features.keys()):
@@ -237,22 +247,50 @@ def model_fn_builder(bert_config, init_checkpoint, learning_rate,
   return model_fn
 
 
+def ranking_loss(predictions, labels):
+  """Ranking loss as described in https://arxiv.org/pdf/2009.01325.pdf."""
+  # We found that clipping the predictions during training helps, since the
+  # ranking loss itself does not constrain the predictions.
+  # TODO(tsellam): Understand why clipping helps.
+  predictions = tf.clip_by_value(predictions, 0.0, 1.0)
+  # Gets pairs of predictions and pairs of labels in the same order.
+  ii, jj = tf.meshgrid(
+      tf.range(0,
+               tf.shape(predictions)[0]),
+      tf.range(0,
+               tf.shape(predictions)[0]),
+      indexing="ij")
+  indices = tf.stack([tf.reshape(ii, [-1]), tf.reshape(jj, [-1])], axis=1)
+  indices = tf.boolean_mask(indices, indices[:, 0] < indices[:, 1])
+  prediction_pairs = tf.gather(predictions, indices, axis=0)
+  label_pairs = tf.gather(labels, indices, axis=0)
+
+  # For each pair, the loss is - log(sigmoid(s_i - s_j)) where i is the better
+  # translation according to the labels and s_k denotes the predicted score
+  # for translation k.
+  score_diffs = (prediction_pairs[:, 0] - prediction_pairs[:, 1]) * (
+      tf.cast(label_pairs[:, 0] > label_pairs[:, 1], tf.float32) * 2 - 1)
+  per_example_loss = tf.nn.sigmoid_cross_entropy_with_logits(
+      labels=tf.ones_like(score_diffs), logits=score_diffs)
+  return per_example_loss
+
+
 # TF ops to compute the metrics.
 def concat_tensors(predictions, ratings, sources=None):
   """Concatenates batches of ratings and predictions."""
-  concat_predictions_value, concat_predictions_update = \
-      metrics.streaming_concat(predictions)
-  concat_labels_value, concat_labels_update = \
-      metrics.streaming_concat(ratings)
+  concat_predictions_value, concat_predictions_update = (
+      metrics.streaming_concat(predictions))
+  concat_labels_value, concat_labels_update = (
+      metrics.streaming_concat(ratings))
   if sources is None:
-    return concat_predictions_value, concat_labels_value, \
-        tf.group(concat_predictions_update, concat_labels_update)
+    return (concat_predictions_value, concat_labels_value,
+            tf.group(concat_predictions_update, concat_labels_update))
 
-  concat_sources_value, concat_sources_update = \
-      metrics.streaming_concat(sources)
-  return concat_predictions_value, concat_labels_value, concat_sources_value, \
-        tf.group(concat_predictions_update, concat_labels_update,
-                 concat_sources_update)
+  concat_sources_value, concat_sources_update = (
+      metrics.streaming_concat(sources))
+  return (concat_predictions_value, concat_labels_value, concat_sources_value,
+          tf.group(concat_predictions_update, concat_labels_update,
+                   concat_sources_update))
 
 
 def kendall_tau_metric(predictions, ratings, weights=None):
@@ -366,26 +404,27 @@ def _serving_input_fn_builder(seq_length):
   # `tf.placeholder(tf.int64, shape=[None, seq_length])` to be compatible with
   # TF2's eager mode, which deprecates all calls to `tf.placeholder`.
   if tf.executing_eagerly():
+    assert not FLAGS.dynamic_seq_length, (
+        "Training with `dynamic_seq_length is not supported in Eager mode.")
     name_to_features = {
         "input_ids": tf.zeros(dtype=tf.int64, shape=[0, seq_length]),
         "input_mask": tf.zeros(dtype=tf.int64, shape=[0, seq_length]),
         "segment_ids": tf.zeros(dtype=tf.int64, shape=[0, seq_length])
     }
-  elif not tf.executing_eagerly() and not FLAGS.dynamic_seq_length:
-    name_to_features = {
-        "input_ids": tf.placeholder(tf.int64, shape=[None, seq_length]),
-        "input_mask": tf.placeholder(tf.int64, shape=[None, seq_length]),
-        "segment_ids": tf.placeholder(tf.int64, shape=[None, seq_length])
-    }
-  elif FLAGS.dynamic_seq_length:
-    assert not tf.executing_eagerly(), \
-        "Training with `dynamic_seq_length` is not supported in Eager mode."
-    logging.info("Exporting a model with dynamic sequence length.")
-    name_to_features = {
-        "input_ids": tf.placeholder(tf.int64, shape=[None, None]),
-        "input_mask": tf.placeholder(tf.int64, shape=[None, None]),
-        "segment_ids": tf.placeholder(tf.int64, shape=[None, None])
-    }
+  else:
+    if FLAGS.dynamic_seq_length:
+      logging.info("Exporting a model with dynamic sequence length.")
+      name_to_features = {
+          "input_ids": tf.placeholder(tf.int64, shape=[None, None]),
+          "input_mask": tf.placeholder(tf.int64, shape=[None, None]),
+          "segment_ids": tf.placeholder(tf.int64, shape=[None, None])
+      }
+    else:
+      name_to_features = {
+          "input_ids": tf.placeholder(tf.int64, shape=[None, seq_length]),
+          "input_mask": tf.placeholder(tf.int64, shape=[None, seq_length]),
+          "segment_ids": tf.placeholder(tf.int64, shape=[None, seq_length])
+      }
   return tf.estimator.export.build_raw_serving_input_receiver_fn(
       name_to_features)
 
@@ -394,6 +433,7 @@ def run_finetuning(train_tfrecord,
                    dev_tfrecord,
                    train_eval_fun=None,
                    use_tpu=False,
+                   multi_eval_names=None,
                    additional_train_params=None):
   """Main function to train and eval BLEURT."""
 
@@ -405,7 +445,9 @@ def run_finetuning(train_tfrecord,
   init_checkpoint = bleurt_params["init_checkpoint"]
 
   logging.info("Creating input data pipeline.")
-  logging.info("Train/Eval batch size: {}".format(str(FLAGS.batch_size)))
+  logging.info("Train batch size: {}, eval batch size: {}".format(
+      str(FLAGS.batch_size), str(FLAGS.eval_batch_size)))
+  logging.info("Train data: {}".format(train_tfrecord))
 
   train_input_fn = input_fn_builder(
       train_tfrecord,
@@ -414,12 +456,42 @@ def run_finetuning(train_tfrecord,
       batch_size=FLAGS.batch_size,
       drop_remainder=use_tpu)
 
-  dev_input_fn = input_fn_builder(
-      dev_tfrecord,
-      seq_length=max_seq_length,
-      is_training=False,
-      batch_size=FLAGS.batch_size,
-      drop_remainder=use_tpu)
+  additional_eval_specs = None
+  if isinstance(dev_tfrecord, str):
+    logging.info("Validation data: {}".format(dev_tfrecord))
+    dev_input_fn = input_fn_builder(
+        dev_tfrecord,
+        seq_length=max_seq_length,
+        is_training=False,
+        batch_size=FLAGS.eval_batch_size,
+        drop_remainder=use_tpu)
+  elif isinstance(dev_tfrecord, list) and dev_tfrecord:
+    logging.info("Validation data: {}".format(",".join(dev_tfrecord)))
+    dev_input_fn = input_fn_builder(
+        dev_tfrecord[0],
+        seq_length=max_seq_length,
+        is_training=False,
+        batch_size=FLAGS.eval_batch_size,
+        drop_remainder=use_tpu)
+    additional_eval_specs = []
+    for i in range(1, len(dev_tfrecord)):
+      additional_dev_input_fn = input_fn_builder(
+          dev_tfrecord[i],
+          seq_length=max_seq_length,
+          is_training=False,
+          batch_size=FLAGS.eval_batch_size,
+          drop_remainder=use_tpu)
+      eval_name = multi_eval_names[i] if multi_eval_names and len(
+          multi_eval_names) > i else "eval_%s" % i
+      additional_eval_specs.append(
+          tf.estimator.EvalSpec(
+              name=eval_name,
+              input_fn=additional_dev_input_fn,
+              steps=FLAGS.num_eval_steps))
+      logging.info("len(additional_eval_specs): ", len(additional_eval_specs))
+  else:
+    raise ValueError(
+        "dev_tfrecord can only be a string or list: {}".format(dev_tfrecord))
 
   logging.info("Creating model.")
   bert_config = modeling.BertConfig.from_json_file(bert_config_file)
@@ -444,7 +516,7 @@ def run_finetuning(train_tfrecord,
           serving_input_receiver_fn=_serving_input_fn_builder(max_seq_length),
           event_file_pattern="eval_default/*.tfevents.*",
           compare_fn=_model_comparator,
-          exports_to_keep=1)
+          exports_to_keep=3)
   ]
   tf.enable_resource_variables()
 
@@ -455,5 +527,6 @@ def run_finetuning(train_tfrecord,
       model_fn=model_fn,
       train_input_fn=train_input_fn,
       eval_input_fn=dev_input_fn,
+      additional_eval_specs=additional_eval_specs,
       exporters=exporters,
       **additional_train_params)

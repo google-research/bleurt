@@ -226,9 +226,10 @@ class BleurtScorer(object):
 
 
 class LengthBatchingBleurtScorer(BleurtScorer):
-  """Experimental implementation of uniform length batching, inspired by BERTscore.
+  """Experimental implementation of uniform length batching.
 
-  A good explanation may be found here:
+  Inspired by BERTscore https://github.com/Tiiiger/bert_score.
+  A nice explanation may be found here:
   https://towardsdatascience.com/divide-hugging-face-transformers-training-time-by-2-or-more-21bf7129db9q-21bf7129db9e
 
   It is not clear to whom the technique should be attributed.
