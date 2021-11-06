@@ -56,14 +56,14 @@ WMT_LOCATIONS = {
              "http://ufallab.ms.mff.cuni.cz/~bojar/"),
         "eval_data": ("newstest2017-segment-level-human",
                       "newstest2017-segment-level-human.tar.gz",
-                      "http://computing.dcu.ie/~ygraham/")
+                      "https://www.computing.dcu.ie/~ygraham/")
     },
     2018: {
         "submissions":
             ("wmt18-metrics-task-nohybrids", "wmt18-metrics-task-nohybrids.tgz",
              "http://ufallab.ms.mff.cuni.cz/~bojar/wmt18/"),
         "eval_data": ("newstest2018-humaneval", "newstest2018-humaneval.tar.gz",
-                      "http://computing.dcu.ie/~ygraham/")
+                      "https://www.computing.dcu.ie/~ygraham/")
     },
     2019: {
         "submissions": ("wmt19-submitted-data-v3",
