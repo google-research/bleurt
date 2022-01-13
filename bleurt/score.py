@@ -208,9 +208,9 @@ class BleurtScorer(object):
       input_ids, input_mask, segment_ids = encoding.encode_batch(
           batch_ref, batch_cand, self.tokenizer, self.max_seq_length)
       tf_input = {
-          "input_ids": input_ids,
-          "input_mask": input_mask,
-          "segment_ids": segment_ids
+          "input_ids": input_ids.astype('int64'),
+          "input_mask": input_mask.astype('int64'),
+          "segment_ids": segment_ids.astype('int64')
       }
       predict_out = self._predictor.predict(tf_input)
       batch_results = predict_out.tolist()
