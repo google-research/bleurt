@@ -19,7 +19,7 @@ This script will allow pip-installing BLEURT as a Python module.
 
 import setuptools
 
-with open("README.md", "r") as fh:
+with open("README.md", "r", encoding="utf8") as fh:
   long_description = fh.read()
 
 install_requires = [
