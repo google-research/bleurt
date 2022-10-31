@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# Lint as: python3
 """Downloads ratings data from the WMT Metrics shared task.
 
 More info about the datasets: https://www.statmt.org/wmt19/metrics-task.html
@@ -44,11 +43,11 @@ flags.DEFINE_string(
 WMT_LOCATIONS = {
     2015: {
         "eval_data": ("DAseg-wmt-newstest2015", "DAseg-wmt-newstest2015.tar.gz",
-                      "http://www.computing.dcu.ie/~ygraham/")
+                      "https://www.scss.tcd.ie/~ygraham/")
     },
     2016: {
         "eval_data": ("DAseg-wmt-newstest2016", "DAseg-wmt-newstest2016.tar.gz",
-                      "http://www.computing.dcu.ie/~ygraham/")
+                      "https://www.scss.tcd.ie/~ygraham/")
     },
     2017: {
         "submissions":
@@ -56,21 +55,21 @@ WMT_LOCATIONS = {
              "http://ufallab.ms.mff.cuni.cz/~bojar/"),
         "eval_data": ("newstest2017-segment-level-human",
                       "newstest2017-segment-level-human.tar.gz",
-                      "http://computing.dcu.ie/~ygraham/")
+                      "https://www.scss.tcd.ie/~ygraham/")
     },
     2018: {
         "submissions":
             ("wmt18-metrics-task-nohybrids", "wmt18-metrics-task-nohybrids.tgz",
              "http://ufallab.ms.mff.cuni.cz/~bojar/wmt18/"),
         "eval_data": ("newstest2018-humaneval", "newstest2018-humaneval.tar.gz",
-                      "http://computing.dcu.ie/~ygraham/")
+                      "https://www.scss.tcd.ie/~ygraham/")
     },
     2019: {
         "submissions": ("wmt19-submitted-data-v3",
                         "wmt19-submitted-data-v3-txt-minimal.tgz",
                         "http://ufallab.ms.mff.cuni.cz/~bojar/wmt19/"),
         "eval_data": ("newstest2019-humaneval", "newstest2019-humaneval.tar.gz",
-                      "https://www.computing.dcu.ie/~ygraham/")
+                      "https://www.scss.tcd.ie/~ygraham/")
     }
 }
 

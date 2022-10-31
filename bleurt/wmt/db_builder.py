@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# Lint as: python3
 r"""Library to build download and aggregate WMT ratings data.
 
 More info about the datasets: https://www.statmt.org/wmt19/metrics-task.html

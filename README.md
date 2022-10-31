@@ -1,6 +1,6 @@
 # BLEURT: a Transfer Learning-Based Metric for Natural Language Generation
 
-BLEURT is an evaluation metric for Natural Language Generation. It takes a pair of sentences as input, a *reference* and a *candidate*, and it returns a score that indicates to what extent the candidate is fluent and conveys the mearning of the reference. It is comparable to [`sentence-BLEU`](https://en.wikipedia.org/wiki/BLEU), [`BERTscore`](https://arxiv.org/abs/1904.09675), and [`COMET`](https://github.com/Unbabel/COMET).
+BLEURT is an evaluation metric for Natural Language Generation. It takes a pair of sentences as input, a *reference* and a *candidate*, and it returns a score that indicates to what extent the candidate is fluent and conveys the meaning of the reference. It is comparable to [`sentence-BLEU`](https://en.wikipedia.org/wiki/BLEU), [`BERTscore`](https://arxiv.org/abs/1904.09675), and [`COMET`](https://github.com/Unbabel/COMET).
 
 BLEURT is a *trained metric*, that is, it is a regression model trained on ratings data. The model is based on [`BERT`](https://arxiv.org/abs/1810.04805) and [`RemBERT`](https://arxiv.org/pdf/2010.12821.pdf). This repository contains all the code necessary to use it and/or fine-tune it for your own applications. BLEURT uses Tensorflow, and it benefits greatly from modern GPUs (it runs on CPU too).
 
@@ -100,7 +100,7 @@ candidates = ["This is the test."]
 
 scorer = score.BleurtScorer(checkpoint)
 scores = scorer.score(references=references, candidates=candidates)
-assert type(scores) == list and len(scores) == 1
+assert isinstance(scores, list) and len(scores) == 1
 print(scores)
 ```
 Here again, BLEURT will default to `BERT-Tiny` if no checkpoint is specified.
@@ -206,7 +206,7 @@ python -m bleurt.score_files \
 ## Reproducibility
 
 You may find information about how to work with ratings from the [WMT Metrics Shared Task](http://www.statmt.org/wmt19/metrics-task.html), reproduce results
-from [our ACL paper](https://arxiv.org/abs/2004.04696), and a selection of models from [our EMNLP paper](http://arxiv.org/abs/2110.06341) [here](https://github.com/google-research/bleurt/blob/master/wmt_experiments.md).
+from [our ACL paper](https://arxiv.org/abs/2004.04696), and a selection of models from [our EMNLP paper](http://arxiv.org/abs/2110.06341) on [this page](https://github.com/google-research/bleurt/blob/master/wmt_experiments.md).
 
 
 ## How to Cite
@@ -219,5 +219,15 @@ Please cite our ACL paper:
   author = {Thibault Sellam and Dipanjan Das and Ankur P Parikh},
   year = {2020},
   booktitle = {Proceedings of ACL}
+}
+```
+
+The latest model, BLEURT-20, is based on work that led to this follow-up paper:
+```
+@inproceedings{pu2021learning,
+  title = {Learning compact metrics for MT},
+  author = {Pu, Amy and Chung, Hyung Won and Parikh, Ankur P and Gehrmann, Sebastian and Sellam, Thibault},
+  booktitle = {Proceedings of EMNLP},
+  year = {2021}
 }
 ```

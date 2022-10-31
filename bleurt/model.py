@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# Lint as: python3
 """BLEURT's Tensorflow ops."""
 
 from bleurt import checkpoint as checkpoint_lib
@@ -21,6 +20,7 @@ import numpy as np
 from scipy import stats
 import tensorflow.compat.v1 as tf
 
+from tensorflow.compat.v1 import estimator as tf_estimator
 from tf_slim import metrics
 from bleurt.lib import modeling
 
@@ -173,19 +173,19 @@ def model_fn_builder(bert_config, init_checkpoint, learning_rate,
     input_mask = features["input_mask"]
     segment_ids = features["segment_ids"]
 
-    if mode != tf.estimator.ModeKeys.PREDICT:
+    if mode != tf_estimator.ModeKeys.PREDICT:
       scores = features["score"]
     else:
       scores = tf.zeros(tf.shape(input_ids)[0])
 
-    is_training = (mode == tf.estimator.ModeKeys.TRAIN)
+    is_training = (mode == tf_estimator.ModeKeys.TRAIN)
     total_loss, per_example_loss, pred = create_model(
         bert_config, is_training, input_ids, input_mask, segment_ids, scores,
         use_one_hot_embeddings, n_hidden_layers, hidden_layers_width,
         dropout_rate)
 
     output_spec = None
-    if mode == tf.estimator.ModeKeys.TRAIN:
+    if mode == tf_estimator.ModeKeys.TRAIN:
 
       # Loads pretrained model
       logging.info("**** Initializing from {} ****".format(init_checkpoint))
@@ -216,30 +216,30 @@ def model_fn_builder(bert_config, init_checkpoint, learning_rate,
                                                num_warmup_steps, use_tpu)
 
       if use_tpu:
-        output_spec = tf.estimator.tpu.TPUEstimatorSpec(
+        output_spec = tf_estimator.tpu.TPUEstimatorSpec(
             mode=mode,
             loss=total_loss,
             train_op=train_op,
             scaffold_fn=scaffold_fn)
 
       else:
-        output_spec = tf.estimator.EstimatorSpec(
+        output_spec = tf_estimator.EstimatorSpec(
             mode=mode, loss=total_loss, train_op=train_op)
 
-    elif mode == tf.estimator.ModeKeys.EVAL:
+    elif mode == tf_estimator.ModeKeys.EVAL:
 
       if use_tpu:
         eval_metrics = (metric_fn, [per_example_loss, pred, scores])
-        output_spec = tf.estimator.TPUEstimatorSpec(
+        output_spec = tf_estimator.TPUEstimatorSpec(
             mode=mode, loss=total_loss, eval_metric=eval_metrics)
       else:
-        output_spec = tf.estimator.EstimatorSpec(
+        output_spec = tf_estimator.EstimatorSpec(
             mode=mode,
             loss=total_loss,
             eval_metric_ops=metric_fn(per_example_loss, pred, scores))
 
-    elif mode == tf.estimator.ModeKeys.PREDICT:
-      output_spec = tf.estimator.EstimatorSpec(
+    elif mode == tf_estimator.ModeKeys.PREDICT:
+      output_spec = tf_estimator.EstimatorSpec(
           mode=mode, predictions={"predictions": pred})
 
     return output_spec
@@ -425,7 +425,7 @@ def _serving_input_fn_builder(seq_length):
           "input_mask": tf.placeholder(tf.int64, shape=[None, seq_length]),
           "segment_ids": tf.placeholder(tf.int64, shape=[None, seq_length])
       }
-  return tf.estimator.export.build_raw_serving_input_receiver_fn(
+  return tf_estimator.export.build_raw_serving_input_receiver_fn(
       name_to_features)
 
 
@@ -484,7 +484,7 @@ def run_finetuning(train_tfrecord,
       eval_name = multi_eval_names[i] if multi_eval_names and len(
           multi_eval_names) > i else "eval_%s" % i
       additional_eval_specs.append(
-          tf.estimator.EvalSpec(
+          tf_estimator.EvalSpec(
               name=eval_name,
               input_fn=additional_dev_input_fn,
               steps=FLAGS.num_eval_steps))
@@ -511,7 +511,7 @@ def run_finetuning(train_tfrecord,
 
   logging.info("Creating TF Estimator.")
   exporters = [
-      tf.estimator.BestExporter(
+      tf_estimator.BestExporter(
           "bleurt_best",
           serving_input_receiver_fn=_serving_input_fn_builder(max_seq_length),
           event_file_pattern="eval_default/*.tfevents.*",

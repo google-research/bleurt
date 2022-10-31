@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# Lint as: python3
 """BLEURT scoring library."""
 
 import os
@@ -65,10 +64,10 @@ class EagerPredictor(Predictor):
 
   def predict(self, input_dict):
     predictions = self._bleurt_model_ops(
-        input_ids=tf.constant(input_dict["input_ids"]),
-        input_mask=tf.constant(input_dict["input_mask"]),
-        segment_ids=tf.constant(
-            input_dict["segment_ids"]))["predictions"].numpy()
+        input_ids=tf.constant(input_dict["input_ids"], dtype=tf.int64),
+        input_mask=tf.constant(input_dict["input_mask"], dtype=tf.int64),
+        segment_ids=tf.constant(input_dict["segment_ids"],
+                                dtype=tf.int64))["predictions"].numpy()
     return predictions
 
 

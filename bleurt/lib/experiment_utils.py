@@ -23,6 +23,7 @@ from __future__ import print_function
 from absl import flags
 
 import tensorflow.compat.v1 as tf
+from tensorflow.compat.v1 import estimator as tf_estimator
 
 flags.DEFINE_integer("batch_size", 16, "Batch size.")
 
@@ -59,18 +60,18 @@ def run_experiment(model_fn,
                    additional_eval_specs=None,
                    exporters=None):
   """Run experiment."""
-  run_config = tf.estimator.RunConfig(
+  run_config = tf_estimator.RunConfig(
       model_dir=FLAGS.model_dir,
       tf_random_seed=FLAGS.tf_random_seed,
       save_checkpoints_steps=FLAGS.save_checkpoints_steps,
       keep_checkpoint_max=FLAGS.keep_checkpoint_max)
-  estimator = tf.estimator.Estimator(
+  estimator = tf_estimator.Estimator(
       config=run_config, model_fn=model_fn, model_dir=FLAGS.model_dir)
-  train_spec = tf.estimator.TrainSpec(
+  train_spec = tf_estimator.TrainSpec(
       input_fn=train_input_fn, max_steps=FLAGS.num_train_steps)
   assert not additional_eval_specs, (
       "Multiple eval sets are not supported with default experiment runner.")
-  eval_spec = tf.estimator.EvalSpec(
+  eval_spec = tf_estimator.EvalSpec(
       name="default",
       input_fn=eval_input_fn,
       exporters=exporters,
@@ -79,5 +80,5 @@ def run_experiment(model_fn,
       steps=FLAGS.num_eval_steps)
 
   tf.logging.set_verbosity(tf.logging.INFO)
-  tf.estimator.train_and_evaluate(
+  tf_estimator.train_and_evaluate(
       estimator=estimator, train_spec=train_spec, eval_spec=eval_spec)

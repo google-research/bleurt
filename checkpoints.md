@@ -56,6 +56,7 @@ The column `max #tokens` specifies the size of BLEURT's input. Internally, the m
 #### From an existing BLEURT checkpoint
 
 BLEURT offers a command-line tool to fine-tune checkpoints on a custom set of ratings.
+Currently, we only support fine-tuning the previous generation of checkpoints, based on English BERT (discussed in the previous section).
 To illustrate, the following command fine-tunes BERT-tiny on a toy set of examples:
 
 ```
@@ -66,7 +67,7 @@ python -m bleurt.finetune \
   -dev_set=bleurt/test_data/ratings_dev.jsonl \
   -num_train_steps=500
 ```
-You may open the files `test_data/ratings_*.jsonl` for example of how the files should be formattted.
+You may open the files `test_data/ratings_*.jsonl` for example of how the files should be formatted.
 Internally, the script tokenizes the JSON sentences, it serializes them into TFRecord files,
 and it runs a train/eval loop. It saves the best model and exports it as a BLEURT checkpoint.
 
