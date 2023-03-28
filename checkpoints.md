@@ -14,11 +14,11 @@ with a `bleurt_config.json` file that defines some parmeters for BLEURT. Additio
 
 ## The Recommended Checkpoint: BLEURT-20
 
-Currently, the recommended checkpoint is [BLEURT-20](https://storage.googleapis.com/bleurt-oss-21/BLEURT-20.zip). BLEURT-20 is a 32 layers pre-trained Transformer model, [RemBERT](https://arxiv.org/pdf/2010.12821.pdf), fine-tuned on:
+Currently, the recommended checkpoint is [BLEURT-20](https://storage.googleapis.com/bleurt-oss-21/BLEURT-20.zip). BLEURT-20 is a 32 layers pre-trained Transformer model, [RemBERT](https://openreview.net/forum?id=xpFFI_NtgpW), fine-tuned on:
 1. ratings from the WMT Metrics Shared Task (~430K sentence pairs), collected during years 2015 to 2019 of the workshop.
 2. synthetic data (~160K sentence pairs), also derived from the WMT corpus. We created "perfect" sentence pairs, by copying the reference into the hypothesis, as well as "catastrophic" ones, by sampling tokens for each language pair randomly.
 
-The details of the architecture and fine-tuning are presented in our [EMNLP paper](https://arxiv.org/abs/2110.06341); the architecture is similar to RemBERT-32, with input sequence length 512 instead of 128.
+The details of the architecture and fine-tuning are presented in our [EMNLP paper](https://aclanthology.org/2021.emnlp-main.58/); the architecture is similar to RemBERT-32, with input sequence length 512 instead of 128.
 
 
 ## Distilled Models
@@ -32,11 +32,11 @@ To facilitate experimentations, we provide 3 compressed versions of BLEURT-20: [
 | [BLEURT-20-D6](https://storage.googleapis.com/bleurt-oss-21/BLEURT-20-D6.zip) | 0.211 | 0.429 | 45M | 5.4 | 0.4 |
 | [BLEURT-20-D3](https://storage.googleapis.com/bleurt-oss-21/BLEURT-20-D3.zip) | 0.191 | 0.385 | 30M | 2.7 | 0.2 |
 
-The `Agreement w. Human Ratings` columns report the segment-level correlation with human ratings (Kendall Tau) on WMT Metrics'20 as described in our [EMNLP paper](https://arxiv.org/abs/2110.06341). The runtime is reported without any optimization, we expect a 2-10X speedup with [length-based batching](https://github.com/google-research/bleurt/blob/master/README.md#speeding-up-bleurt). We report the the parameter count of the pre-trained models (i.e., without the terminal fully-connected layer). The models and methdology used for distillation are described in our [EMNLP paper](https://arxiv.org/abs/2110.06341).
+The `Agreement w. Human Ratings` columns report the segment-level correlation with human ratings (Kendall Tau) on WMT Metrics'20 as described in our [EMNLP paper](https://aclanthology.org/2021.emnlp-main.58/). The runtime is reported without any optimization, we expect a 2-10X speedup with [length-based batching](https://github.com/google-research/bleurt/blob/master/README.md#speeding-up-bleurt). We report the the parameter count of the pre-trained models (i.e., without the terminal fully-connected layer). The models and methdology used for distillation are described in our [EMNLP paper](https://aclanthology.org/2021.emnlp-main.58/).
 
 ## Historical Checkpoints (English only)
 
-Previously, we released checkpoints based on BERT-English and fine-tuned on [WMT Metrics ratings data from 2015 to 2018](http://www.statmt.org/wmt19/metrics-task.html). We present them below for archival purpose. These checkpoints were trained in three steps: normal BERT pre-training (see [Devlin et al.](https://arxiv.org/abs/1810.04805) and [Turc et al.](https://arxiv.org/abs/1908.08962)), pre-training on synthetic ratings, then fine-tuning on the [WMT Metrics](http://www.statmt.org/wmt19/metrics-task.html) database of human ratings, years 2015 to 2018. The general approach is presented in our [ACL paper](https://arxiv.org/abs/2004.04696). Compared to the published results, we used 20k training steps, a batch size of 16, and export every 250 steps.
+Previously, we released checkpoints based on BERT-English and fine-tuned on [WMT Metrics ratings data from 2015 to 2018](http://www.statmt.org/wmt19/metrics-task.html). We present them below for archival purpose. These checkpoints were trained in three steps: normal BERT pre-training (see [Devlin et al.](https://aclanthology.org/N19-1423/) and [Turc et al.](https://arxiv.org/abs/1908.08962)), pre-training on synthetic ratings, then fine-tuning on the [WMT Metrics](http://www.statmt.org/wmt19/metrics-task.html) database of human ratings, years 2015 to 2018. The general approach is presented in our [ACL paper](https://aclanthology.org/2020.acl-main.704/). Compared to the published results, we used 20k training steps, a batch size of 16, and export every 250 steps.
 
 Name                            | Max #tokens  | Size (#layers, # hidden units)  |
 :------------------------------ |:---:| :----:|
