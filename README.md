@@ -139,7 +139,7 @@ The crucial part is the call to `score.create_bleurt_ops`, which creates the TF 
 A *BLEURT checkpoint* is a self-contained folder that contains a regression model and some information that BLEURT needs to run. BLEURT checkpoints can be downloaded, copy-pasted, and stored anywhere. Furthermore, checkpoints are tunable, which means that they can be fine-tuned on custom ratings data.
 
 
-BLEURT defaults to the `test` checkpoint, which is very inaccaurate. We recommend
+BLEURT defaults to the `test` checkpoint, which is very inaccurate. We recommend
 using [`BLEURT-20`](https://storage.googleapis.com/bleurt-oss-21/BLEURT-20.zip) for results reporting. You may use it as follows:
 
 ```
