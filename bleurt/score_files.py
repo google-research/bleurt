@@ -67,7 +67,7 @@ def _json_generator(sentence_pairs_file):
       sentence_pairs_file), "Sentence pairs file {} not found".format(
           sentence_pairs_file)
   with tf.io.gfile.GFile(sentence_pairs_file, "r") as pairs_file:
-    ratings_df = pd.read_json(pairs_file, lines=True)
+    ratings_df = pd.read_json(pairs_file, lines=True, dtype=False)
     for _, row in ratings_df.iterrows():
       assert row.get("reference") is not None, (
           "Reference sentence not found, are you sure the JSON record "
